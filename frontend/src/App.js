@@ -14,12 +14,17 @@ function App() {
   const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:80';
 
   useEffect(() => {
-    console.log("API URL:", apiUrl);
+    console.log("Current API URL:", apiUrl);
     // Test API connection
     fetch(`${apiUrl}/status`)
         .then(res => res.json())
         .then(data => console.log("API Status:", data))
-        .catch(err => console.error("API Connection Error:", err));
+        .catch(err => {
+            console.error("API Connection Error Details:", {
+                message: err.message,
+                stack: err.stack
+            });
+        });
   }, [apiUrl]);
 
   const analyzeSentiment = async () => {
