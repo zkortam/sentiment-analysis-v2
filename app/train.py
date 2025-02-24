@@ -9,6 +9,7 @@ import joblib
 random.seed(42)
 np.random.seed(42)
 
+# Define positive and negative sentence templates.
 positive_templates = [
     "I love this product", "This is amazing", "Absolutely fantastic experience",
     "Highly recommend this", "I really enjoy using this", "This is outstanding",
@@ -46,13 +47,9 @@ adjectives = [
 
 num_samples_per_class = 5000
 
-positive_data = []
-negative_data = []
-
-for template in positive_templates:
-    positive_data.append(template)
-for template in negative_templates:
-    negative_data.append(template)
+# Create datasets.
+positive_data = positive_templates.copy()
+negative_data = negative_templates.copy()
 
 for _ in range(num_samples_per_class):
     pos_sentence = random.choice(positive_templates) + " " + random.choice(adjectives)
@@ -66,14 +63,19 @@ labels = [1] * len(positive_data) + [0] * len(negative_data)
 df = pd.DataFrame({'text': data, 'sentiment': labels})
 print(f"Generated dataset with {len(df)} samples.")
 
-vectorizer = TfidfVectorizer(ngram_range=(1,2), max_features=5000)
+# Create TF-IDF features.
+vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=5000)
 X = vectorizer.fit_transform(df['text'])
 
+# Shuffle and split the data.
 df = df.sample(frac=1, random_state=42).reset_index(drop=True)
 X_train, X_test, y_train, y_test = train_test_split(X, df['sentiment'], test_size=0.2, random_state=42)
 
+# Train logistic regression model.
 model = LogisticRegression(max_iter=2000)
 model.fit(X_train, y_train)
 
-joblib.dump({'model': model, 'vectorizer': vectorizer}, 'sentiment.pkl')
-print("Model trained and saved as sentiment.pkl")
+# Sanity check: Ensure a positive review is predicted as positive.
+sample_input = "I love this product"
+predicted = model.predict(vectorizer.transform([sample_input]))[0]
+print(f"Sanity check for '{sample_input}':", "positive" if predicted == 1 else "negative"

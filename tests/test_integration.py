@@ -1,29 +1,28 @@
 import requests
 
-BASE_URL = "http://localhost:80"
+# Replace BASE_URL with your current API endpoint.
+BASE_URL = "http://acb0be7bd92a148e1a464121365cd6a1-150769251.us-east-2.elb.amazonaws.com"
 
-def test_root():
-    resp = requests.get(f"{BASE_URL}/")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "message" in data
+def test_status():
+    response = requests.get(f"{BASE_URL}/status")
+    assert response.status_code == 200, f"Status endpoint returned {response.status_code}"
+    data = response.json()
+    assert data.get("status") == "ok", f"Unexpected status response: {data}"
 
-def test_positive_sentiment():
-    payload = {"text": "I love this product"}
-    resp = requests.post(f"{BASE_URL}/predict", json=payload)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data.get("sentiment") == "positive"
+def test_predict_positive():
+    response = requests.post(
+        f"{BASE_URL}/predict",
+        json={"text": "I love this product"}
+    )
+    assert response.status_code == 200, f"Predict endpoint returned {response.status_code}"
+    data = response.json()
+    assert data.get("sentiment") == "positive", f"Expected positive sentiment, got: {data.get('sentiment')}"
 
-def test_negative_sentiment():
-    payload = {"text": "I hate this service"}
-    resp = requests.post(f"{BASE_URL}/predict", json=payload)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data.get("sentiment") == "negative"
-
-if __name__ == "__main__":
-    test_root()
-    test_positive_sentiment()
-    test_negative_sentiment()
-    print("All integration tests passed!")
+def test_predict_negative():
+    response = requests.post(
+        f"{BASE_URL}/predict",
+        json={"text": "I hate this product"}
+    )
+    assert response.status_code == 200, f"Predict endpoint returned {response.status_code}"
+    data = response.json()
+    assert data.get("sentiment") == "negative", f"Expected negative sentiment, got: {data.get('sentiment')}"
