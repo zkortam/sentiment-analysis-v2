@@ -28,99 +28,172 @@ function App() {
     });
   }, [loading, activeEndpoint, apiStatus, history, text, sentiment]);
 
+  // Enhanced testEndpoint function with more logging
   const testEndpoint = async (url) => {
-    console.log(`Testing endpoint ${url}...`);
     const startTime = performance.now();
+    console.group(`API Endpoint Test: ${url}`);
+    console.log(`🕒 Test started at: ${new Date().toISOString()}`);
+    console.log(`📡 Testing endpoint: ${url}`);
     
     try {
+      console.log('⏳ Sending status request...');
       const response = await axios.get(`${url}/status`, { 
         timeout: 5000,
-        validateStatus: (status) => status < 500 // Accept any status < 500
+        validateStatus: (status) => status < 500
       });
       
       const endTime = performance.now();
-      console.log(`Endpoint ${url} responded in ${endTime - startTime}ms:`, response.data);
+      const duration = endTime - startTime;
       
+      console.log('✅ Endpoint test successful:', {
+        url,
+        statusCode: response.status,
+        responseTime: `${duration.toFixed(2)}ms`,
+        data: response.data,
+        headers: response.headers
+      });
+
       return {
         success: true,
-        responseTime: endTime - startTime,
+        responseTime: duration,
         data: response.data
       };
     } catch (error) {
-      console.error(`Endpoint ${url} failed:`, {
-        message: error.message,
-        code: error.code,
-        response: error.response,
-        config: error.config
+      console.error('❌ Endpoint test failed:', {
+        url,
+        errorType: error.name,
+        errorMessage: error.message,
+        errorCode: error.code,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers,
+        config: {
+          timeout: error.config?.timeout,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+          headers: error.config?.headers
+        }
       });
       
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        errorDetails: {
+          type: error.name,
+          code: error.code,
+          status: error.response?.status
+        }
       };
+    } finally {
+      console.groupEnd();
     }
   };
 
   const analyzeSentiment = async () => {
     if (!text.trim()) {
-      console.log('Empty text, skipping analysis');
+      console.warn('🚫 Analysis cancelled: Empty text input');
       return;
     }
 
-    console.log('Starting sentiment analysis:', {
-      text,
-      endpoint: activeEndpoint,
-      timestamp: new Date().toISOString()
-    });
+    console.group('Sentiment Analysis Request');
+    console.log(`🕒 Analysis started at: ${new Date().toISOString()}`);
+    console.log('📝 Input text:', text);
+    console.log('🎯 Active endpoint:', activeEndpoint);
 
     setLoading(true);
     const startTime = performance.now();
 
     try {
-      // First try primary endpoint if it's active
-      if (activeEndpoint === primaryUrl) {
-        console.log('Attempting primary endpoint...');
-        const response = await axios.post(`${primaryUrl}/predict`, { text }, {
-          timeout: 20000,
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        console.log('Primary endpoint response:', response.data);
-        setSentiment(response.data.sentiment);
-        setHistory(prev => [...prev, { text, sentiment: response.data.sentiment }]);
-        setLoading(false);
-        return;
-      }
-
-      // Try fallback endpoint
-      console.log('Attempting fallback endpoint...');
-      const response = await axios.post(`${fallbackUrl}/predict`, { text }, {
-        timeout: 20000,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      let endpoint = activeEndpoint;
+      console.log(`📡 Sending request to ${endpoint}`);
       
-      console.log('Fallback endpoint response:', response.data);
+      const requestConfig = {
+        timeout: 20000,
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Request-Time': new Date().toISOString()
+        }
+      };
+
+      console.log('⚙️ Request configuration:', {
+        endpoint,
+        payload: { text },
+        ...requestConfig
+      });
+
+      const response = await axios.post(`${endpoint}/predict`, { text }, requestConfig);
+      
+      const endTime = performance.now();
+      console.log('✅ Analysis successful:', {
+        duration: `${(endTime - startTime).toFixed(2)}ms`,
+        statusCode: response.status,
+        headers: response.headers,
+        data: response.data
+      });
+
       setSentiment(response.data.sentiment);
-      setHistory(prev => [...prev, { text, sentiment: response.data.sentiment }]);
+      setHistory(prev => {
+        const newHistory = [...prev, { text, sentiment: response.data.sentiment }];
+        console.log('📊 Updated history:', {
+          previousLength: prev.length,
+          newLength: newHistory.length,
+          latestEntry: { text, sentiment: response.data.sentiment }
+        });
+        return newHistory;
+      });
 
     } catch (error) {
-      console.error('Analysis failed:', {
-        message: error.message,
-        code: error.code,
-        response: error.response?.data,
-        endpoint: activeEndpoint
+      const endTime = performance.now();
+      console.error('❌ Analysis failed:', {
+        duration: `${(endTime - startTime).toFixed(2)}ms`,
+        errorType: error.name,
+        errorMessage: error.message,
+        errorCode: error.code,
+        endpoint: activeEndpoint,
+        response: {
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers
+        },
+        request: {
+          config: error.config,
+          timing: {
+            started: startTime,
+            ended: endTime,
+            duration: `${(endTime - startTime).toFixed(2)}ms`
+          }
+        }
       });
 
-      setSentiment('Error: ' + (error.response?.data?.detail || error.message));
+      // Try fallback if primary fails
+      if (activeEndpoint === primaryUrl) {
+        console.log('🔄 Attempting fallback endpoint...');
+        try {
+          const fallbackResponse = await axios.post(`${fallbackUrl}/predict`, { text }, requestConfig);
+          console.log('✅ Fallback request successful:', fallbackResponse.data);
+          setSentiment(fallbackResponse.data.sentiment);
+          setActiveEndpoint(fallbackUrl);
+        } catch (fallbackError) {
+          console.error('❌ Fallback request failed:', {
+            error: fallbackError.message,
+            details: fallbackError
+          });
+          setSentiment('Error: All endpoints failed');
+        }
+      } else {
+        setSentiment('Error: ' + (error.response?.data?.detail || error.message));
+      }
+
       setApiStatus({
         status: 'error',
-        error: error.message
+        error: error.message,
+        timestamp: new Date().toISOString()
       });
-
     } finally {
-      const endTime = performance.now();
-      console.log(`Analysis completed in ${endTime - startTime}ms`);
+      const finalTime = performance.now();
+      console.log(`⏱️ Total operation time: ${(finalTime - startTime).toFixed(2)}ms`);
       setLoading(false);
+      console.groupEnd();
     }
   };
 
