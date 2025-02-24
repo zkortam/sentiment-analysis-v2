@@ -15,6 +15,12 @@ function App() {
   const primaryUrl = 'https://rtsa.zakariakortam.com';
   const fallbackUrl = 'http://acb0be7bd92a148e1a464121365cd6a1-150769251.us-east-2.elb.amazonaws.com';
 
+  // Reset loading state on mount and if something goes wrong
+  useEffect(() => {
+    setLoading(false);
+    return () => setLoading(false);
+  }, []);
+
   // Test endpoint availability
   const testEndpoint = async (url) => {
     try {
@@ -41,23 +47,31 @@ function App() {
   useEffect(() => {
     const checkEndpoints = async () => {
       console.log("Checking available endpoints...");
+      setLoading(false);  // Ensure loading is false when checking endpoints
       
-      // Try primary endpoint first
-      if (await testEndpoint(primaryUrl)) {
-        console.log("Using primary endpoint:", primaryUrl);
-        setActiveEndpoint(primaryUrl);
-        return;
-      }
+      try {
+        // Try primary endpoint first
+        if (await testEndpoint(primaryUrl)) {
+          console.log("Using primary endpoint:", primaryUrl);
+          setActiveEndpoint(primaryUrl);
+          return;
+        }
 
-      // Fall back to direct ELB URL
-      if (await testEndpoint(fallbackUrl)) {
-        console.warn("Primary endpoint failed, using fallback:", fallbackUrl);
-        setActiveEndpoint(fallbackUrl);
-        return;
-      }
+        // Fall back to direct ELB URL
+        if (await testEndpoint(fallbackUrl)) {
+          console.warn("Primary endpoint failed, using fallback:", fallbackUrl);
+          setActiveEndpoint(fallbackUrl);
+          return;
+        }
 
-      console.error("All endpoints failed");
-      setActiveEndpoint(null);
+        console.error("All endpoints failed");
+        setActiveEndpoint(null);
+      } catch (error) {
+        console.error("Error checking endpoints:", error);
+        setActiveEndpoint(null);
+      } finally {
+        setLoading(false);  // Ensure loading is false after checking endpoints
+      }
     };
 
     checkEndpoints();
@@ -124,6 +138,8 @@ function App() {
     setText(newText);
   };
 
+  const showMixedContentWarning = !activeEndpoint && window.location.protocol === 'https:';
+
   return (
     <div className="App">
       <header>
@@ -131,6 +147,12 @@ function App() {
         {activeEndpoint && (
           <div className="endpoint-indicator">
             Using: {activeEndpoint === primaryUrl ? 'Primary API' : 'Fallback API'}
+          </div>
+        )}
+        {showMixedContentWarning && (
+          <div className="warning-message">
+            Unable to connect to API. If using Chrome, click the 🔒 icon in the address bar, 
+            select "Site settings", and allow "Insecure content".
           </div>
         )}
       </header>

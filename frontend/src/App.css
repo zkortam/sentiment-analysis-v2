@@ -191,3 +191,13 @@
     display: inline-block;
   }
   
+  .warning-message {
+    background: rgba(255, 193, 7, 0.2);
+    color: #856404;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px auto;
+    max-width: 600px;
+    font-size: 0.9em;
+  }
+  
