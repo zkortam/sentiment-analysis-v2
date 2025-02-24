@@ -1,0 +1,48 @@
+name: Deploy to AWS EKS
+
+on:
+  push:
+    branches:
+      - main  # or your default branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Authenticate Docker to AWS ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin 677276084635.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Build Docker Image
+        run: |
+          docker build --platform linux/amd64 -t sentiment-analysis:latest .
+      
+      - name: Tag Docker Image for ECR
+        run: |
+          docker tag sentiment-analysis:latest 677276084635.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sentiment-analysis:latest
+
+      - name: Push Docker Image to ECR
+        run: |
+          docker push 677276084635.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sentiment-analysis:latest
+
+      - name: Update Kubernetes Deployment
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+        run: |
+          # If you have a kubeconfig secret stored in GitHub Secrets, you can load it here.
+          # Alternatively, you can use the AWS CLI to update the kubeconfig.
+          # For example:
+          aws eks update-kubeconfig --name sentiment-cluster --region ${{ secrets.AWS_REGION }}
+          kubectl set image deployment/sentiment-analysis-deployment sentiment-analysis=677276084635.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sentiment-analysis:latest
+          kubectl rollout status deployment/sentiment-analysis-deployment
