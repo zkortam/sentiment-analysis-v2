@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/sentiment-analysis-v2/static/css/main.f3fb067f.css",
+    "main.js": "/sentiment-analysis-v2/static/js/main.8fbe7566.js",
+    "index.html": "/sentiment-analysis-v2/index.html",
+    "main.f3fb067f.css.map": "/sentiment-analysis-v2/static/css/main.f3fb067f.css.map",
+    "main.8fbe7566.js.map": "/sentiment-analysis-v2/static/js/main.8fbe7566.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.f3fb067f.css",
+    "static/js/main.8fbe7566.js"
+  ]
+}
