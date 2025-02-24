@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// frontend/src/App.js
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import SentimentChart from './components/SentimentChart';
 import StatusMonitor from './components/StatusMonitor';
@@ -11,6 +12,10 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:80';
+
+  useEffect(() => {
+    console.log("API URL:", apiUrl);
+  }, [apiUrl]);
 
   const analyzeSentiment = async () => {
     setLoading(true);

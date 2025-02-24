@@ -1,3 +1,4 @@
+// frontend/src/components/StatusMonitor.js
 import React, { useState } from 'react';
 import axios from 'axios';
 
@@ -7,8 +8,12 @@ function StatusMonitor() {
 
   const checkStatus = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/`);
-      setStatus(response.data?.message ? 'All Systems Operational' : 'Unknown');
+      const response = await axios.get(`${apiUrl}/status`);
+      if (response.data && response.data.aws) {
+        setStatus('All Systems Operational');
+      } else {
+        setStatus('Status Unknown');
+      }
     } catch (error) {
       console.error('Error checking status:', error);
       setStatus('Error');
