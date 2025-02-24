@@ -1,3 +1,4 @@
+# .github/workflows/ci.yaml
 name: CI/CD Pipeline
 
 on:
@@ -32,10 +33,10 @@ jobs:
         pip install requests
         python test_integration.py
 
-    # Docker Build and Push
+    # Docker Build and Push to Docker Hub
     - name: Build Docker image
       run: |
-        docker build -t zkortam/sentiment-analysis:latest .
+        docker build --platform linux/amd64 -t zkortam/sentiment-analysis:latest .
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
@@ -43,11 +44,11 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-    - name: Push Docker image
+    - name: Push Docker image to Docker Hub
       run: |
         docker push zkortam/sentiment-analysis:latest
 
-    # Deploy Backend to AWS ECR (Optional: If Using AWS ECR)
+    # Deploy Backend to AWS ECR (Optional)
     - name: Log in to AWS ECR
       run: |
         aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_REPO }}
@@ -58,7 +59,7 @@ jobs:
         docker push ${{ secrets.AWS_ECR_REPO }}/sentiment-analysis:latest
 
     # Deploy to Kubernetes Cluster (EKS)
-    - name: Configure AWS CLI
+    - name: Configure AWS CLI and Update Kubeconfig
       run: |
         aws eks update-kubeconfig --region us-east-2 --name sentiment-cluster
 
@@ -75,31 +76,26 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    # Inject API URL for Frontend
-    - name: Inject API URL
+    - name: Inject API URL for Frontend
       run: echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" > frontend/.env
 
-    # Setup Node.js
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
         cache: 'npm'
 
-    # Install Frontend Dependencies
-    - name: Install dependencies
+    - name: Install Frontend Dependencies
       run: |
         cd frontend
         npm install
 
-    # Build Frontend
     - name: Build Frontend
       run: |
         cd frontend
         npm run build
 
-    # Deploy to GitHub Pages
-    - name: Deploy to GitHub Pages
+    - name: Deploy Frontend to GitHub Pages
       run: |
         cd frontend
         npm run deploy
