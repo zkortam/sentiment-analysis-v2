@@ -13,12 +13,13 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
+    # Backend Setup
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
 
-    - name: Install dependencies
+    - name: Install backend dependencies
       run: |
         cd app
         pip install --upgrade pip
@@ -31,9 +32,10 @@ jobs:
         pip install requests
         python test_integration.py
 
+    # Docker Build and Push
     - name: Build Docker image
       run: |
-        docker build -t your-dockerhub-username/sentiment-analysis:latest .
+        docker build -t zkortam/sentiment-analysis:latest .
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
@@ -43,4 +45,61 @@ jobs:
 
     - name: Push Docker image
       run: |
-        docker push your-dockerhub-username/sentiment-analysis:latest
+        docker push zkortam/sentiment-analysis:latest
+
+    # Deploy Backend to AWS ECR (Optional: If Using AWS ECR)
+    - name: Log in to AWS ECR
+      run: |
+        aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_REPO }}
+
+    - name: Tag and Push Docker Image to AWS ECR
+      run: |
+        docker tag zkortam/sentiment-analysis:latest ${{ secrets.AWS_ECR_REPO }}/sentiment-analysis:latest
+        docker push ${{ secrets.AWS_ECR_REPO }}/sentiment-analysis:latest
+
+    # Deploy to Kubernetes Cluster (EKS)
+    - name: Configure AWS CLI
+      run: |
+        aws eks update-kubeconfig --region us-east-2 --name sentiment-cluster
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
+
+  frontend:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # Inject API URL for Frontend
+    - name: Inject API URL
+      run: echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" > frontend/.env
+
+    # Setup Node.js
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    # Install Frontend Dependencies
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm install
+
+    # Build Frontend
+    - name: Build Frontend
+      run: |
+        cd frontend
+        npm run build
+
+    # Deploy to GitHub Pages
+    - name: Deploy to GitHub Pages
+      run: |
+        cd frontend
+        npm run deploy
