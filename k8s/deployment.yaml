@@ -5,7 +5,7 @@ metadata:
   labels:
     app: sentiment-analysis
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: sentiment-analysis
@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: sentiment-analysis
-        image: zkortam/sentiment-analysis:latest
+        image: 677276084635.dkr.ecr.us-east-2.amazonaws.com/sentiment-analysis:latest  # Use your ECR repo
         ports:
         - containerPort: 80
         readinessProbe:
