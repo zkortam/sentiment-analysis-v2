@@ -30,15 +30,36 @@ function App() {
   const analyzeSentiment = async () => {
     setLoading(true);
     try {
-      const response = await axios.post(`${apiUrl}/predict`, { text });
+      console.log("Making API request to:", `${apiUrl}/predict`);
+      console.log("Request payload:", { text });
+      
+      const response = await axios.post(`${apiUrl}/predict`, { text }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000, // 10 second timeout
+      });
+      
+      console.log("API Response:", response);
       const result = response.data.sentiment;
       setSentiment(result);
       setHistory([...history, { text, sentiment: result }]);
     } catch (error) {
-      console.error('Error analyzing sentiment:', error.response || error);
+      console.error('API Error Details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+        }
+      });
       setSentiment('Error: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);  // Ensure loading is set to false even if there's an error
     }
-    setLoading(false);
   };
 
   return (
