@@ -10,145 +10,107 @@ function App() {
   const [sentiment, setSentiment] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [activeEndpoint, setActiveEndpoint] = useState(null);
 
-  const defaultApiUrl =
-    process.env.NODE_ENV === 'production'
-      ? 'https://rtsa.zakariakortam.com'
-      : 'http://localhost:80';
-  const apiUrl = process.env.REACT_APP_API_URL || defaultApiUrl;
+  const primaryUrl = 'https://rtsa.zakariakortam.com';
+  const fallbackUrl = 'http://acb0be7bd92a148e1a464121365cd6a1-150769251.us-east-2.elb.amazonaws.com';
 
+  // Test endpoint availability
+  const testEndpoint = async (url) => {
+    try {
+      const response = await axios.get(`${url}/status`, { timeout: 5000 });
+      console.log(`Endpoint ${url} is responsive:`, response.data);
+      return true;
+    } catch (error) {
+      console.log(`Endpoint ${url} failed:`, error.message);
+      return false;
+    }
+  };
+
+  // Initialize and test endpoints
   useEffect(() => {
-    // Log environment and configuration
-    console.log({
-      environment: process.env.NODE_ENV,
-      apiUrl: apiUrl,
-      currentTime: new Date().toISOString(),
-    });
-
-    // Test API connection on component mount
-    const checkApiStatus = async () => {
-      try {
-        console.log("Checking API status at:", `${apiUrl}/status`);
-        const response = await axios.get(`${apiUrl}/status`);
-        console.log("API Status Response:", response.data);
-        return response.data;
-      } catch (error) {
-        console.error("API Status Check Failed:", {
-          error: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          endpoint: `${apiUrl}/status`
-        });
-        return null;
+    const checkEndpoints = async () => {
+      console.log("Checking available endpoints...");
+      
+      // Try primary endpoint first
+      if (await testEndpoint(primaryUrl)) {
+        console.log("Using primary endpoint:", primaryUrl);
+        setActiveEndpoint(primaryUrl);
+        return;
       }
+
+      // Fall back to direct ELB URL
+      if (await testEndpoint(fallbackUrl)) {
+        console.warn("Primary endpoint failed, using fallback:", fallbackUrl);
+        setActiveEndpoint(fallbackUrl);
+        return;
+      }
+
+      console.error("All endpoints failed");
+      setActiveEndpoint(null);
     };
 
-    checkApiStatus();
-
-    // Log component mount
-    console.log("App component mounted with initial state:", {
-      text,
-      sentiment,
-      historyLength: history.length,
-      loading
-    });
-
-    return () => {
-      console.log("App component unmounting");
-    };
-  }, [apiUrl]);
-
-  // Log state changes
-  useEffect(() => {
-    console.log("State updated:", {
-      currentText: text,
-      currentSentiment: sentiment,
-      historyLength: history.length,
-      isLoading: loading
-    });
-  }, [text, sentiment, history, loading]);
+    checkEndpoints();
+  }, []);
 
   const analyzeSentiment = async () => {
-    console.log("Starting sentiment analysis for text:", text);
+    if (!activeEndpoint) {
+      setSentiment('Error: No available API endpoint');
+      return;
+    }
+
+    console.log("Starting sentiment analysis using endpoint:", activeEndpoint);
     setLoading(true);
     
     try {
-      console.log("Making API request to:", `${apiUrl}/predict`);
-      console.log("Request payload:", { text });
-      console.log("Request headers:", {
-        'Content-Type': 'application/json'
-      });
-
-      const startTime = performance.now();
-      
-      const response = await axios.post(`${apiUrl}/predict`, { text }, {
+      const response = await axios.post(`${activeEndpoint}/predict`, { text }, {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 20000, // Using your 20-second timeout
+        timeout: 20000,
       });
       
-      const endTime = performance.now();
-      console.log(`API request completed in ${endTime - startTime}ms`);
-      
-      console.log("API Response:", {
-        status: response.status,
-        headers: response.headers,
-        data: response.data
-      });
-
+      console.log("API Response:", response.data);
       const result = response.data.sentiment;
-      console.log("Parsed sentiment result:", result);
-
       setSentiment(result);
-      
-      // Log history update
-      const newHistory = [...history, { text, sentiment: result }];
-      console.log("Updating history:", {
-        previousLength: history.length,
-        newLength: newHistory.length,
-        latestEntry: { text, sentiment: result }
-      });
-      
-      setHistory(newHistory);
+      setHistory([...history, { text, sentiment: result }]);
 
     } catch (error) {
       console.error('API Error Details:', {
+        endpoint: activeEndpoint,
         message: error.message,
-        name: error.name,
-        stack: error.stack,
-        response: {
-          data: error.response?.data,
-          status: error.response?.status,
-          headers: error.response?.headers,
-        },
-        request: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers,
-          data: error.config?.data,
-        }
+        response: error.response?.data,
       });
 
-      if (error.code === 'ECONNABORTED') {
-        console.error('Request timeout - API endpoint may be down or unreachable');
-        setSentiment('Error: API is not responding. Please try again later.');
-      } else {
-        setSentiment('Error: ' + (error.response?.data?.detail || error.message));
+      // If primary endpoint fails during request, try fallback
+      if (activeEndpoint === primaryUrl) {
+        console.log("Attempting fallback to ELB URL...");
+        try {
+          const fallbackResponse = await axios.post(`${fallbackUrl}/predict`, { text }, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 20000,
+          });
+          
+          const result = fallbackResponse.data.sentiment;
+          setSentiment(result);
+          setHistory([...history, { text, sentiment: result }]);
+          setActiveEndpoint(fallbackUrl); // Switch to fallback for future requests
+          return;
+        } catch (fallbackError) {
+          console.error('Fallback request also failed:', fallbackError.message);
+        }
       }
+
+      setSentiment('Error: API is not responding. Please try again later.');
     } finally {
       setLoading(false);
-      console.log("Analysis completed, loading state reset to false");
     }
   };
 
   const handleTextChange = (e) => {
     const newText = e.target.value;
-    console.log("Text input changed:", {
-      previousLength: text.length,
-      newLength: newText.length,
-      changed: text !== newText
-    });
     setText(newText);
   };
 
@@ -156,6 +118,11 @@ function App() {
     <div className="App">
       <header>
         <h1>Real-time Sentiment Analysis</h1>
+        {activeEndpoint && (
+          <div className="endpoint-indicator">
+            Using: {activeEndpoint === primaryUrl ? 'Primary API' : 'Fallback API'}
+          </div>
+        )}
       </header>
       <main>
         <textarea
@@ -164,11 +131,14 @@ function App() {
           onChange={handleTextChange}
         />
         <br />
-        <button onClick={analyzeSentiment} disabled={loading}>
+        <button 
+          onClick={analyzeSentiment} 
+          disabled={loading || !activeEndpoint}
+        >
           {loading ? 'Analyzing...' : 'Analyze'}
         </button>
         {sentiment && (
-          <div className={`sentiment-result ${sentiment}`}>
+          <div className={`sentiment-result ${sentiment.toLowerCase().includes('error') ? 'error' : sentiment}`}>
             <h2>Sentiment: {sentiment.toUpperCase()}</h2>
           </div>
         )}

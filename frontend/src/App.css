@@ -182,3 +182,12 @@
     }
   }
   
+  .endpoint-indicator {
+    font-size: 0.8em;
+    margin-top: 10px;
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    display: inline-block;
+  }
+  
