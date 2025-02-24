@@ -6,159 +6,178 @@ import StatusMonitor from './components/StatusMonitor';
 import './App.css';
 
 function App() {
-  console.log("App component rendering"); // Debug log
-
   const [text, setText] = useState('');
   const [sentiment, setSentiment] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeEndpoint, setActiveEndpoint] = useState(null);
+  const [apiStatus, setApiStatus] = useState({ status: 'unknown', error: null });
 
   const primaryUrl = 'https://rtsa.zakariakortam.com';
   const fallbackUrl = 'http://acb0be7bd92a148e1a464121365cd6a1-150769251.us-east-2.elb.amazonaws.com';
 
-  // Debug loading state changes
+  // Debug logging for state changes
   useEffect(() => {
-    console.log("Loading state changed:", loading);
-  }, [loading]);
+    console.log('State Update:', {
+      loading,
+      activeEndpoint,
+      apiStatus,
+      historyLength: history.length,
+      currentText: text,
+      currentSentiment: sentiment
+    });
+  }, [loading, activeEndpoint, apiStatus, history, text, sentiment]);
 
   const testEndpoint = async (url) => {
+    console.log(`Testing endpoint ${url}...`);
+    const startTime = performance.now();
+    
     try {
-      console.log(`Testing endpoint: ${url}`); // Debug log
-      const response = await axios.get(`${url}/status`, { timeout: 5000 });
-      console.log(`Endpoint ${url} is responsive:`, response.data);
-      return true;
+      const response = await axios.get(`${url}/status`, { 
+        timeout: 5000,
+        validateStatus: (status) => status < 500 // Accept any status < 500
+      });
+      
+      const endTime = performance.now();
+      console.log(`Endpoint ${url} responded in ${endTime - startTime}ms:`, response.data);
+      
+      return {
+        success: true,
+        responseTime: endTime - startTime,
+        data: response.data
+      };
     } catch (error) {
-      const isHttpsPage = window.location.protocol === 'https:';
-      const isHttpEndpoint = url.startsWith('http:');
+      console.error(`Endpoint ${url} failed:`, {
+        message: error.message,
+        code: error.code,
+        response: error.response,
+        config: error.config
+      });
       
-      if (isHttpsPage && isHttpEndpoint) {
-        console.warn(
-          'Mixed Content: Browser may be blocking HTTP endpoint access from HTTPS page. ' +
-          'Try accessing the page with HTTP or enable mixed content in your browser.'
-        );
-      }
-      
-      console.log(`Endpoint ${url} failed:`, error.message);
-      return false;
+      return {
+        success: false,
+        error: error.message
+      };
     }
   };
 
-  // Separate useEffect for initial loading state reset
-  useEffect(() => {
-    console.log("Initial loading state reset");
-    setLoading(false);
-  }, []);
-
-  // Separate useEffect for endpoint checking
-  useEffect(() => {
-    const checkEndpoints = async () => {
-      console.log("Starting endpoint check");
-      
-      try {
-        if (await testEndpoint(primaryUrl)) {
-          setActiveEndpoint(primaryUrl);
-          return;
-        }
-
-        if (await testEndpoint(fallbackUrl)) {
-          setActiveEndpoint(fallbackUrl);
-          return;
-        }
-
-        setActiveEndpoint(null);
-      } catch (error) {
-        console.error("Error checking endpoints:", error);
-        setActiveEndpoint(null);
-      }
-    };
-
-    checkEndpoints();
-  }, []);
-
   const analyzeSentiment = async () => {
-    if (!activeEndpoint) {
-      setSentiment('Error: No available API endpoint');
+    if (!text.trim()) {
+      console.log('Empty text, skipping analysis');
       return;
     }
 
-    console.log("Starting analysis, setting loading to true");
+    console.log('Starting sentiment analysis:', {
+      text,
+      endpoint: activeEndpoint,
+      timestamp: new Date().toISOString()
+    });
+
     setLoading(true);
-    
+    const startTime = performance.now();
+
     try {
-      const response = await axios.post(`${activeEndpoint}/predict`, { text }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 20000,
-      });
-      
-      const result = response.data.sentiment;
-      setSentiment(result);
-      setHistory([...history, { text, sentiment: result }]);
-
-    } catch (error) {
-      console.error('API Error:', error);
-
+      // First try primary endpoint if it's active
       if (activeEndpoint === primaryUrl) {
-        try {
-          const fallbackResponse = await axios.post(`${fallbackUrl}/predict`, { text }, {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            timeout: 20000,
-          });
-          
-          const result = fallbackResponse.data.sentiment;
-          setSentiment(result);
-          setHistory([...history, { text, sentiment: result }]);
-          setActiveEndpoint(fallbackUrl);
-          return;
-        } catch (fallbackError) {
-          console.error('Fallback request failed:', fallbackError);
-        }
+        console.log('Attempting primary endpoint...');
+        const response = await axios.post(`${primaryUrl}/predict`, { text }, {
+          timeout: 20000,
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        console.log('Primary endpoint response:', response.data);
+        setSentiment(response.data.sentiment);
+        setHistory(prev => [...prev, { text, sentiment: response.data.sentiment }]);
+        setLoading(false);
+        return;
       }
 
-      setSentiment('Error: API is not responding. Please try again later.');
+      // Try fallback endpoint
+      console.log('Attempting fallback endpoint...');
+      const response = await axios.post(`${fallbackUrl}/predict`, { text }, {
+        timeout: 20000,
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      console.log('Fallback endpoint response:', response.data);
+      setSentiment(response.data.sentiment);
+      setHistory(prev => [...prev, { text, sentiment: response.data.sentiment }]);
+
+    } catch (error) {
+      console.error('Analysis failed:', {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data,
+        endpoint: activeEndpoint
+      });
+
+      setSentiment('Error: ' + (error.response?.data?.detail || error.message));
+      setApiStatus({
+        status: 'error',
+        error: error.message
+      });
+
     } finally {
-      console.log("Analysis complete, setting loading to false");
+      const endTime = performance.now();
+      console.log(`Analysis completed in ${endTime - startTime}ms`);
       setLoading(false);
     }
   };
 
-  const handleTextChange = (e) => {
-    const newText = e.target.value;
-    setText(newText);
-  };
+  // Initialize endpoints
+  useEffect(() => {
+    const initializeEndpoints = async () => {
+      console.log('Initializing endpoints...');
+      setLoading(true);
 
-  const showMixedContentWarning = !activeEndpoint && window.location.protocol === 'https:';
+      // Test primary endpoint
+      const primaryTest = await testEndpoint(primaryUrl);
+      if (primaryTest.success) {
+        setActiveEndpoint(primaryUrl);
+        setApiStatus({ status: 'ready', error: null });
+        setLoading(false);
+        return;
+      }
+
+      // Test fallback endpoint
+      const fallbackTest = await testEndpoint(fallbackUrl);
+      if (fallbackTest.success) {
+        setActiveEndpoint(fallbackUrl);
+        setApiStatus({ status: 'fallback', error: null });
+      } else {
+        setActiveEndpoint(null);
+        setApiStatus({ 
+          status: 'error', 
+          error: 'Both endpoints failed' 
+        });
+      }
+      
+      setLoading(false);
+    };
+
+    initializeEndpoints();
+  }, []);
 
   return (
     <div className="App">
       <header>
         <h1>Real-time Sentiment Analysis</h1>
-        {activeEndpoint && (
-          <div className="endpoint-indicator">
-            Using: {activeEndpoint === primaryUrl ? 'Primary API' : 'Fallback API'}
-          </div>
-        )}
-        {showMixedContentWarning && (
-          <div className="warning-message">
-            Unable to connect to API. If using Chrome, click the 🔒 icon in the address bar, 
-            select "Site settings", and allow "Insecure content".
-          </div>
-        )}
+        <div className="api-status">
+          API Status: {apiStatus.status}
+          {apiStatus.error && <div className="error-message">{apiStatus.error}</div>}
+        </div>
       </header>
       <main>
         <textarea
           placeholder="Enter text to analyze sentiment..."
           value={text}
-          onChange={handleTextChange}
+          onChange={(e) => setText(e.target.value)}
+          disabled={loading}
         />
         <br />
         <button 
           onClick={analyzeSentiment} 
-          disabled={loading || !activeEndpoint}
+          disabled={loading || !text.trim()}
         >
           {loading ? 'Analyzing...' : 'Analyze'}
         </button>
