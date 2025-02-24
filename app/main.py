@@ -1,8 +1,17 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from model import predict_sentiment
 
 app = FastAPI(title="Cloud Native Sentiment Analysis API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class SentimentRequest(BaseModel):
     text: str
@@ -16,14 +25,7 @@ def read_root():
 
 @app.get("/status")
 def get_status():
-    # In a real implementation, you would fetch real status data.
-    # For demo purposes, we return simulated status.
-    return {
-        "aws": "OK",
-        "eksCluster": "Running",
-        "docker": "Healthy",
-        "argoCD": "Synced"
-    }
+    return {"aws": "OK", "eksCluster": "Running", "docker": "Healthy", "argoCD": "Synced"}
 
 @app.post("/predict", response_model=SentimentResponse)
 def predict(request: SentimentRequest):

@@ -31,7 +31,6 @@ function App() {
       <header>
         <h1>Real-time Sentiment Analysis</h1>
       </header>
-
       <main>
         <textarea
           placeholder="Enter text to analyze sentiment..."
@@ -42,18 +41,13 @@ function App() {
         <button onClick={analyzeSentiment} disabled={loading}>
           {loading ? 'Analyzing...' : 'Analyze'}
         </button>
-
         {sentiment && (
           <div className={`sentiment-result ${sentiment}`}>
             <h2>Sentiment: {sentiment.toUpperCase()}</h2>
           </div>
         )}
-
-        {/* Sentiment History Chart */}
         <SentimentChart history={history} />
       </main>
-
-      {/* Backend Status Monitor */}
       <StatusMonitor />
     </div>
   );

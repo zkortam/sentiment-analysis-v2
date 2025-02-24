@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: sentiment-analysis
-        image: 677276084635.dkr.ecr.us-east-2.amazonaws.com/sentiment-analysis:latest  # Use your ECR repo
+        image: 677276084635.dkr.ecr.us-east-2.amazonaws.com/sentiment-analysis:latest
         ports:
         - containerPort: 80
         readinessProbe:
