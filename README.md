@@ -1,4 +1,4 @@
-# Sentiment-Analysis-v2
+# Sentiment-Analysis-v2 - By Zakaria Kortam
 
 Real-time sentiment analysis with FastAPI, Kubernetes, and GitOps
 
