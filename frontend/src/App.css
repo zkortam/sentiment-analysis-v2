@@ -10,9 +10,29 @@
     color: white;
   }
   
+  .tabs {
+    margin: 20px 0;
+  }
+  
+  .tabs button {
+    margin: 0 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+  }
+  
+  .tabs button.active {
+    background-color: #61dafb;
+    color: #282c34;
+  }
+  
   textarea {
     padding: 10px;
     font-size: 16px;
+    width: 80%;
+    max-width: 600px;
   }
   
   button {
@@ -20,17 +40,27 @@
     font-size: 16px;
     margin-top: 10px;
     cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    background-color: #61dafb;
+    color: #282c34;
   }
   
-  .result {
+  .result, .error {
     margin-top: 20px;
     font-size: 20px;
-    color: green;
   }
   
   .error {
-    margin-top: 20px;
-    font-size: 18px;
     color: red;
+  }
+  
+  .status-dashboard {
+    margin-top: 20px;
+  }
+  
+  .status-details p {
+    font-size: 18px;
+    margin: 10px 0;
   }
   
