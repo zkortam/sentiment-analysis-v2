@@ -6,6 +6,8 @@ import StatusMonitor from './components/StatusMonitor';
 import './App.css';
 
 function App() {
+  console.log("App component rendering"); // Debug log
+
   const [text, setText] = useState('');
   const [sentiment, setSentiment] = useState(null);
   const [history, setHistory] = useState([]);
@@ -15,15 +17,14 @@ function App() {
   const primaryUrl = 'https://rtsa.zakariakortam.com';
   const fallbackUrl = 'http://acb0be7bd92a148e1a464121365cd6a1-150769251.us-east-2.elb.amazonaws.com';
 
-  // Reset loading state on mount and if something goes wrong
+  // Debug loading state changes
   useEffect(() => {
-    setLoading(false);
-    return () => setLoading(false);
-  }, []);
+    console.log("Loading state changed:", loading);
+  }, [loading]);
 
-  // Test endpoint availability
   const testEndpoint = async (url) => {
     try {
+      console.log(`Testing endpoint: ${url}`); // Debug log
       const response = await axios.get(`${url}/status`, { timeout: 5000 });
       console.log(`Endpoint ${url} is responsive:`, response.data);
       return true;
@@ -43,34 +44,32 @@ function App() {
     }
   };
 
-  // Initialize and test endpoints
+  // Separate useEffect for initial loading state reset
+  useEffect(() => {
+    console.log("Initial loading state reset");
+    setLoading(false);
+  }, []);
+
+  // Separate useEffect for endpoint checking
   useEffect(() => {
     const checkEndpoints = async () => {
-      console.log("Checking available endpoints...");
-      setLoading(false);  // Ensure loading is false when checking endpoints
+      console.log("Starting endpoint check");
       
       try {
-        // Try primary endpoint first
         if (await testEndpoint(primaryUrl)) {
-          console.log("Using primary endpoint:", primaryUrl);
           setActiveEndpoint(primaryUrl);
           return;
         }
 
-        // Fall back to direct ELB URL
         if (await testEndpoint(fallbackUrl)) {
-          console.warn("Primary endpoint failed, using fallback:", fallbackUrl);
           setActiveEndpoint(fallbackUrl);
           return;
         }
 
-        console.error("All endpoints failed");
         setActiveEndpoint(null);
       } catch (error) {
         console.error("Error checking endpoints:", error);
         setActiveEndpoint(null);
-      } finally {
-        setLoading(false);  // Ensure loading is false after checking endpoints
       }
     };
 
@@ -83,7 +82,7 @@ function App() {
       return;
     }
 
-    console.log("Starting sentiment analysis using endpoint:", activeEndpoint);
+    console.log("Starting analysis, setting loading to true");
     setLoading(true);
     
     try {
@@ -94,21 +93,14 @@ function App() {
         timeout: 20000,
       });
       
-      console.log("API Response:", response.data);
       const result = response.data.sentiment;
       setSentiment(result);
       setHistory([...history, { text, sentiment: result }]);
 
     } catch (error) {
-      console.error('API Error Details:', {
-        endpoint: activeEndpoint,
-        message: error.message,
-        response: error.response?.data,
-      });
+      console.error('API Error:', error);
 
-      // If primary endpoint fails during request, try fallback
       if (activeEndpoint === primaryUrl) {
-        console.log("Attempting fallback to ELB URL...");
         try {
           const fallbackResponse = await axios.post(`${fallbackUrl}/predict`, { text }, {
             headers: {
@@ -120,15 +112,16 @@ function App() {
           const result = fallbackResponse.data.sentiment;
           setSentiment(result);
           setHistory([...history, { text, sentiment: result }]);
-          setActiveEndpoint(fallbackUrl); // Switch to fallback for future requests
+          setActiveEndpoint(fallbackUrl);
           return;
         } catch (fallbackError) {
-          console.error('Fallback request also failed:', fallbackError.message);
+          console.error('Fallback request failed:', fallbackError);
         }
       }
 
       setSentiment('Error: API is not responding. Please try again later.');
     } finally {
+      console.log("Analysis complete, setting loading to false");
       setLoading(false);
     }
   };
