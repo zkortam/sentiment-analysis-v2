@@ -11,7 +11,11 @@ function App() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:80';
+  const defaultApiUrl =
+    process.env.NODE_ENV === 'production'
+      ? 'https://rtsa.zakariakortam.com'
+      : 'http://localhost:80';
+  const apiUrl = process.env.REACT_APP_API_URL || defaultApiUrl;
 
   useEffect(() => {
     // Log environment and configuration
@@ -81,7 +85,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 10000,
+        timeout: 20000, // Using your 20-second timeout
       });
       
       const endTime = performance.now();
