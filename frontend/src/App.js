@@ -15,6 +15,11 @@ function App() {
 
   useEffect(() => {
     console.log("API URL:", apiUrl);
+    // Test API connection
+    fetch(`${apiUrl}/status`)
+        .then(res => res.json())
+        .then(data => console.log("API Status:", data))
+        .catch(err => console.error("API Connection Error:", err));
   }, [apiUrl]);
 
   const analyzeSentiment = async () => {
@@ -25,8 +30,8 @@ function App() {
       setSentiment(result);
       setHistory([...history, { text, sentiment: result }]);
     } catch (error) {
-      console.error('Error analyzing sentiment:', error);
-      setSentiment('Error');
+      console.error('Error analyzing sentiment:', error.response || error);
+      setSentiment('Error: ' + (error.response?.data?.detail || error.message));
     }
     setLoading(false);
   };

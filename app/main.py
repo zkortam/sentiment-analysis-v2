@@ -8,7 +8,10 @@ app = FastAPI(title="Cloud Native Sentiment Analysis API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://zkortam.github.io",  # Add your GitHub Pages domain
+        "http://localhost:3000",      # For local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
