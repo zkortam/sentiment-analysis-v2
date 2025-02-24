@@ -11,6 +11,7 @@ app.add_middleware(
     allow_origins=[
         "https://zkortam.github.io",  # Add your GitHub Pages domain
         "http://localhost:3000",      # For local development
+        "https://rtsa.zakariakortam.com"  # Add your custom domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
