@@ -1,142 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
 import './App.css';
 
-function SentimentForm({ apiUrl }) {
+function App() {
   const [text, setText] = useState('');
   const [sentiment, setSentiment] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [status, setStatus] = useState('Unknown');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Use the API URL from environment variables or default to localhost (adjust as needed)
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:80';
+
+  const analyzeSentiment = async () => {
     setLoading(true);
-    setError(null);
-    setSentiment(null);
     try {
-      const response = await fetch(apiUrl + '/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const data = await response.json();
-      setSentiment(data.sentiment);
-    } catch (err) {
-      console.error(err);
-      setError('Error fetching sentiment');
+      const response = await axios.post(`${apiUrl}/predict`, { text });
+      setSentiment(response.data.sentiment);
+    } catch (error) {
+      console.error('Error analyzing sentiment:', error);
+      setSentiment('Error');
     }
     setLoading(false);
   };
 
-  return (
-    <div className="sentiment-form">
-      <h2>Sentiment Analysis</h2>
-      <form onSubmit={handleSubmit}>
-        <textarea
-          placeholder="Enter text here..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows="6"
-          cols="50"
-        />
-        <br />
-        <button type="submit" disabled={loading || !text.trim()}>
-          {loading ? 'Analyzing...' : 'Analyze Sentiment'}
-        </button>
-      </form>
-      {sentiment && (
-        <div className="result">
-          <h3>Result: {sentiment}</h3>
-        </div>
-      )}
-      {error && (
-        <div className="error">
-          <p>{error}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatusDashboard({ apiUrl }) {
-  const [status, setStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Attempt to fetch status from the /status endpoint
-  useEffect(() => {
-    async function fetchStatus() {
-      setLoading(true);
-      try {
-        const response = await fetch(apiUrl + '/status');
-        if (!response.ok) {
-          throw new Error('Status endpoint not available');
-        }
-        const data = await response.json();
-        setStatus(data);
-      } catch (err) {
-        console.error(err);
-        // Simulate status if /status is not implemented
-        setStatus({
-          aws: 'OK',
-          eksCluster: 'Running',
-          docker: 'Healthy',
-          argoCD: 'Synced',
-        });
-        setError('Status endpoint not available, showing simulated status.');
+  const checkStatus = async () => {
+    // This is a placeholder for monitoring status.
+    // If your backend exposes a /status endpoint, you can call it here.
+    try {
+      const response = await axios.get(`${apiUrl}/`);
+      if (response.data && response.data.message) {
+        setStatus('All systems operational');
+      } else {
+        setStatus('Status unknown');
       }
-      setLoading(false);
+    } catch (error) {
+      console.error('Error checking status:', error);
+      setStatus('Error');
     }
-    fetchStatus();
-  }, [apiUrl]);
-
-  return (
-    <div className="status-dashboard">
-      <h2>System Status Dashboard</h2>
-      {loading && <p>Loading status...</p>}
-      {error && <p className="error">{error}</p>}
-      {status && (
-        <div className="status-details">
-          <p><strong>AWS:</strong> {status.aws}</p>
-          <p><strong>EKS Cluster:</strong> {status.eksCluster}</p>
-          <p><strong>Docker:</strong> {status.docker}</p>
-          <p><strong>ArgoCD:</strong> {status.argoCD}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function App() {
-  // Use an environment variable for the API URL, defaulting to localhost:8000
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-  const [activeTab, setActiveTab] = useState('sentiment');
+  };
 
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>Sentiment Analysis & Monitoring Dashboard</h1>
-        <div className="tabs">
-          <button
-            className={activeTab === 'sentiment' ? 'active' : ''}
-            onClick={() => setActiveTab('sentiment')}
-          >
-            Sentiment Analysis
-          </button>
-          <button
-            className={activeTab === 'status' ? 'active' : ''}
-            onClick={() => setActiveTab('status')}
-          >
-            System Status
-          </button>
-        </div>
+      <header>
+        <h1>Sentiment Analysis</h1>
       </header>
       <main>
-        {activeTab === 'sentiment' && <SentimentForm apiUrl={API_URL} />}
-        {activeTab === 'status' && <StatusDashboard apiUrl={API_URL} />}
+        <textarea
+          placeholder="Enter text to analyze sentiment..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <br />
+        <button onClick={analyzeSentiment} disabled={loading}>
+          {loading ? 'Analyzing...' : 'Analyze'}
+        </button>
+        {sentiment && (
+          <div>
+            <h2>Sentiment: {sentiment}</h2>
+          </div>
+        )}
       </main>
+      <section className="status-section">
+        <h2>System Monitoring</h2>
+        <button onClick={checkStatus}>Check System Status</button>
+        <p>{status}</p>
+      </section>
     </div>
   );
 }
