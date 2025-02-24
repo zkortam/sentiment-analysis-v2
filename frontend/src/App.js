@@ -30,68 +30,46 @@ function App() {
 
   // Enhanced testEndpoint function with more logging
   const testEndpoint = async (url) => {
-    const startTime = performance.now();
     console.group(`API Endpoint Test: ${url}`);
-    console.log(`🕒 Test started at: ${new Date().toISOString()}`);
-    console.log(`📡 Testing endpoint: ${url}`);
     
     try {
-      console.log('⏳ Sending status request...');
-      const response = await axios.get(`${url}/status`, { 
-        timeout: 5000,
-        validateStatus: (status) => status < 500
-      });
-      
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      
-      console.log('✅ Endpoint test successful:', {
-        url,
-        statusCode: response.status,
-        responseTime: `${duration.toFixed(2)}ms`,
-        data: response.data,
-        headers: response.headers
-      });
-
-      return {
-        success: true,
-        responseTime: duration,
-        data: response.data
-      };
-    } catch (error) {
-      console.error('❌ Endpoint test failed:', {
-        url,
-        errorType: error.name,
-        errorMessage: error.message,
-        errorCode: error.code,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers,
-        config: {
-          timeout: error.config?.timeout,
-          method: error.config?.method,
-          baseURL: error.config?.baseURL,
-          headers: error.config?.headers
-        }
-      });
-      
-      return {
-        success: false,
-        error: error.message,
-        errorDetails: {
-          type: error.name,
-          code: error.code,
-          status: error.response?.status
-        }
-      };
-    } finally {
-      console.groupEnd();
+      // Try HTTPS first
+      const httpsUrl = url.replace('http://', 'https://');
+      console.log(`🔒 Testing HTTPS endpoint: ${httpsUrl}`);
+      const httpsResponse = await axios.get(`${httpsUrl}/status`, { timeout: 5000 });
+      if (httpsResponse.status === 200) {
+        console.log('✅ HTTPS endpoint available');
+        return { success: true, url: httpsUrl };
+      }
+    } catch (httpsError) {
+      console.log('⚠️ HTTPS endpoint failed, trying HTTP');
     }
+
+    // Try HTTP if HTTPS fails
+    try {
+      console.log(`Testing HTTP endpoint: ${url}`);
+      const response = await axios.get(`${url}/status`, { timeout: 5000 });
+      if (response.status === 200) {
+        console.log('✅ HTTP endpoint available');
+        return { success: true, url };
+      }
+    } catch (error) {
+      console.error('❌ Both HTTPS and HTTP endpoints failed');
+    }
+
+    console.groupEnd();
+    return { success: false, error: 'No endpoints available' };
   };
 
   const analyzeSentiment = async () => {
     if (!text.trim()) {
       console.warn('🚫 Analysis cancelled: Empty text input');
+      return;
+    }
+
+    if (!activeEndpoint) {
+      console.warn('🚫 No active endpoint available');
+      setSentiment('Error: No API endpoint available');
       return;
     }
 
@@ -104,7 +82,7 @@ function App() {
     const startTime = performance.now();
 
     try {
-      let endpoint = activeEndpoint;
+      const endpoint = activeEndpoint;
       console.log(`📡 Sending request to ${endpoint}`);
       
       const requestConfig = {
@@ -115,83 +93,52 @@ function App() {
         }
       };
 
-      console.log('⚙️ Request configuration:', {
-        endpoint,
-        payload: { text },
-        ...requestConfig
-      });
+      // Try HTTPS first
+      try {
+        const httpsEndpoint = endpoint.replace('http://', 'https://');
+        console.log(`🔒 Attempting HTTPS request to ${httpsEndpoint}`);
+        const response = await axios.post(`${httpsEndpoint}/predict`, { text }, requestConfig);
+        
+        const endTime = performance.now();
+        console.log('✅ HTTPS request successful:', {
+          duration: `${(endTime - startTime).toFixed(2)}ms`,
+          data: response.data
+        });
 
+        setSentiment(response.data.sentiment);
+        setHistory(prev => [...prev, { text, sentiment: response.data.sentiment }]);
+        return;
+      } catch (httpsError) {
+        console.log('⚠️ HTTPS request failed, trying HTTP fallback');
+      }
+
+      // HTTP fallback
       const response = await axios.post(`${endpoint}/predict`, { text }, requestConfig);
       
       const endTime = performance.now();
       console.log('✅ Analysis successful:', {
         duration: `${(endTime - startTime).toFixed(2)}ms`,
-        statusCode: response.status,
-        headers: response.headers,
         data: response.data
       });
 
       setSentiment(response.data.sentiment);
-      setHistory(prev => {
-        const newHistory = [...prev, { text, sentiment: response.data.sentiment }];
-        console.log('📊 Updated history:', {
-          previousLength: prev.length,
-          newLength: newHistory.length,
-          latestEntry: { text, sentiment: response.data.sentiment }
-        });
-        return newHistory;
-      });
+      setHistory(prev => [...prev, { text, sentiment: response.data.sentiment }]);
 
     } catch (error) {
-      const endTime = performance.now();
       console.error('❌ Analysis failed:', {
-        duration: `${(endTime - startTime).toFixed(2)}ms`,
-        errorType: error.name,
-        errorMessage: error.message,
-        errorCode: error.code,
+        error: error.message,
         endpoint: activeEndpoint,
-        response: {
-          status: error.response?.status,
-          data: error.response?.data,
-          headers: error.response?.headers
-        },
-        request: {
-          config: error.config,
-          timing: {
-            started: startTime,
-            ended: endTime,
-            duration: `${(endTime - startTime).toFixed(2)}ms`
-          }
-        }
+        status: error.response?.status,
+        data: error.response?.data
       });
 
-      // Try fallback if primary fails
-      if (activeEndpoint === primaryUrl) {
-        console.log('🔄 Attempting fallback endpoint...');
-        try {
-          const fallbackResponse = await axios.post(`${fallbackUrl}/predict`, { text }, requestConfig);
-          console.log('✅ Fallback request successful:', fallbackResponse.data);
-          setSentiment(fallbackResponse.data.sentiment);
-          setActiveEndpoint(fallbackUrl);
-        } catch (fallbackError) {
-          console.error('❌ Fallback request failed:', {
-            error: fallbackError.message,
-            details: fallbackError
-          });
-          setSentiment('Error: All endpoints failed');
-        }
-      } else {
-        setSentiment('Error: ' + (error.response?.data?.detail || error.message));
-      }
-
+      setSentiment('Error: API is not responding. Please try again later.');
       setApiStatus({
         status: 'error',
         error: error.message,
         timestamp: new Date().toISOString()
       });
     } finally {
-      const finalTime = performance.now();
-      console.log(`⏱️ Total operation time: ${(finalTime - startTime).toFixed(2)}ms`);
       setLoading(false);
       console.groupEnd();
     }
@@ -206,7 +153,7 @@ function App() {
       // Test primary endpoint
       const primaryTest = await testEndpoint(primaryUrl);
       if (primaryTest.success) {
-        setActiveEndpoint(primaryUrl);
+        setActiveEndpoint(primaryTest.url);
         setApiStatus({ status: 'ready', error: null });
         setLoading(false);
         return;
@@ -215,7 +162,7 @@ function App() {
       // Test fallback endpoint
       const fallbackTest = await testEndpoint(fallbackUrl);
       if (fallbackTest.success) {
-        setActiveEndpoint(fallbackUrl);
+        setActiveEndpoint(fallbackTest.url);
         setApiStatus({ status: 'fallback', error: null });
       } else {
         setActiveEndpoint(null);
@@ -235,9 +182,12 @@ function App() {
     <div className="App">
       <header>
         <h1>Real-time Sentiment Analysis</h1>
-        <div className="api-status">
-          API Status: {apiStatus.status}
-          {apiStatus.error && <div className="error-message">{apiStatus.error}</div>}
+        <div className="endpoint-status">
+          {activeEndpoint ? (
+            <span className="status-ok">✅ API Connected: {activeEndpoint}</span>
+          ) : (
+            <span className="status-error">❌ No API Connection</span>
+          )}
         </div>
       </header>
       <main>
