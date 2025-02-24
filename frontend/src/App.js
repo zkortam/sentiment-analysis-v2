@@ -22,6 +22,16 @@ function App() {
       console.log(`Endpoint ${url} is responsive:`, response.data);
       return true;
     } catch (error) {
+      const isHttpsPage = window.location.protocol === 'https:';
+      const isHttpEndpoint = url.startsWith('http:');
+      
+      if (isHttpsPage && isHttpEndpoint) {
+        console.warn(
+          'Mixed Content: Browser may be blocking HTTP endpoint access from HTTPS page. ' +
+          'Try accessing the page with HTTP or enable mixed content in your browser.'
+        );
+      }
+      
       console.log(`Endpoint ${url} failed:`, error.message);
       return false;
     }
